@@ -124,14 +124,10 @@ def postqueue(tv_shows):
     log.debug(f'Processing file: "{source}"')
     e = parse_episode(basename(source))
 
-    # Figure out a title for the TV show, based on the filename
-    title = e.title.replace('_', ' ').replace('.', ' ').title()
     # Does this TV show already exist (fuzzy match)?
     G = NGram([d for d in listdir(tv_shows)])
-    found = G.find(title, THRESHOLD)
-    if found is not None:
-        log.info(f'Matched "{title}" to "{found}"')
-        title = found
+    found = G.find(e.title, THRESHOLD)
+    title = found if found is not None else e.title
 
     # Create an output filename
     t = title.lower().replace(' ', '.')
@@ -164,4 +160,6 @@ def parse_episode(text):
         raise ValueError(f'"{text}" is not a valid episode')
     # Store matched episode
     episode = namedtuple('Episode', ['title', 'season', 'episode', 'trailer'])
-    return episode(m.group(1), int(m.group(2)), int(m.group(3)), m.group(4))
+    # Clean up title
+    title = m.group(1).replace('_', ' ').replace('.', ' ').title()
+    return episode(title, int(m.group(2)), int(m.group(3)), m.group(4))
