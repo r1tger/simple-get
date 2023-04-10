@@ -11,8 +11,9 @@ from re import match, I
 from ngram import NGram
 from collections import namedtuple
 from os import listdir, environ, makedirs, chdir
-from os.path import join, isfile, isdir, getsize, dirname, basename
+from os.path import join, isfile, isdir, getsize, dirname, basename, exists
 from shutil import rmtree, move
+from pprint import pprint
 
 import logging
 log = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ log = logging.getLogger(__name__)
 LOG_FORMAT = '[%(levelname)s] [%(relativeCreated)d] %(message)s'
 EPISODES_REGEX = r'(.+)[\. ][s|S]?([0-9]{1,2})[x|X|e|E]([0-9]{2}).*(1080p.*)'
 MOVIES_REGEX = r'(?P<title>.+) \((?P<year>.+)\) \[1080p\]'
+THRESHOLD = 0.7
 
 
 @group()
@@ -58,30 +60,33 @@ def prequeue(rss, tv_shows, get_all, no_pilots):
 
     """
     try:
-        log.info('Running in prequeue (episodes) mode')
         # Retrieve the RSS feed
         response = get(rss)
         response.raise_for_status()
         # Load as XML
         rss = ElementTree.fromstring(response.content)
+
         # Match each item in the RSS feed to an episode regex
-        transmission_rpc = TransmissionRPC()
         G = NGram([d for d in listdir(tv_shows)])
+        transmission_rpc = TransmissionRPC()
         for item in rss.iter('item'):
             # Parse title (must be a valid episode name)
             try:
                 e = parse_episode(item.find('title').text)
-                skip = False
+                skip = True
                 # Skip any episodes that do not meet the threshold
-                if len(G.search(e.title, threshold=0.9)) == 0:
-                    skip = True
+                found = G.find(e.title, THRESHOLD)
+                if found is not None:
+                    log.info(f'TV show "{e.title}" matched against "{found}"')
+                    skip = False
                 if not no_pilots and e.episode == 1:
                     # Download the first episode of a season for all tv shows
                     skip = False
                 if get_all:
+                    # Will invalidate any previous conditions
                     skip = False
                 if skip:
-                    log.info(f'Skipping {e.title} {e.season}x{e.episode}')
+                    log.debug(f'Skipping {e.title} {e.season}x{e.episode}')
                     continue
                 log.info(f'Uploading "{e.title} {e.season}x{e.episode}"')
                 transmission_rpc.torrent_add(filename=item.find('link').text)
@@ -105,6 +110,7 @@ def postqueue(tv_shows):
     """
     filename, directory = (environ['TR_TORRENT_NAME'],
                            environ['TR_TORRENT_DIR'])
+
     # Source filename or directory
     path = source = join(directory, filename)
     if isdir(path):
@@ -114,14 +120,27 @@ def postqueue(tv_shows):
                       sorted((getsize(s), s) for s in listdir(path))[-1][1])
     if not isfile(source):
         raise ValueError(f'Source "{source}" is not a file')
-    log.info(f'Processing file: "{source}"')
+
+    log.debug(f'Processing file: "{source}"')
     e = parse_episode(basename(source))
+
+    # Figure out a title for the TV show, based on the filename
+    title = e.title.replace('_', ' ').replace('.', ' ').title()
+    # Does this TV show already exist (fuzzy match)?
+    G = NGram([d for d in listdir(tv_shows)])
+    found = G.find(title, THRESHOLD)
+    if found is not None:
+        log.info(f'Matched "{title}" to "{found}"')
+        title = found
+
     # Create an output filename
-    t = e.title.lower().replace('_', '.').replace(' ', '.')
+    t = title.lower().replace(' ', '.')
     output = f'{t}.s{e.season:>02}e{e.episode:>02}.{e.trailer}'
-    destination = join(tv_shows, e.title.replace('.', ' ').title(),
-                       f'Season {e.season:>02}', output)
+    destination = join(tv_shows, title, f'Season {e.season:>02}', output)
     log.info(f'Writing "{source}" to "{destination}"')
+    if exists(destination):
+        raise ValueError(f'Destination "{destination}" already exists')
+
     # Create directory if it does not exist
     makedirs(dirname(destination), exist_ok=True)
     # Move file to new location

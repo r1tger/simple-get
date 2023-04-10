@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='simpleget',
-    version='0.1.0',
+    version='0.2.0',
     description='Go get it!',
     url='https://github.com/r1tger/simple-get',
     author='Ritger Teunissen',
