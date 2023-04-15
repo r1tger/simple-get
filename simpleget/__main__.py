@@ -69,17 +69,19 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
     rss = ElementTree.fromstring(response.content)
 
     # Match each item in the RSS feed to an episode regex
-    G = NGram([d for d in listdir(tv_shows)])
     transmission_rpc = TransmissionRPC()
     for item in rss.iter('item'):
         # Parse title (must be a valid episode name)
         try:
-            e = parse_episode(item.find('title').text)
+            title = item.find('title').text
+            # Process episode
+            e = parse_episode(title)
+            destination_dir = dirname(format_episode(tv_shows, e))
+            # Process file
             skip = True
-            # Skip any episodes that do not meet the threshold
-            found = G.find(e.title, THRESHOLD)
-            if found is not None:
-                log.info(f'TV show "{e.title}" matched against "{found}"')
+            if isdir(destination_dir) and not exists_episode(tv_shows, e):
+                # Download if destination directory exists, but episode doesn't
+                log.info(f'Matched "{title}"')
                 skip = False
             if not no_pilots and e.episode == 1:
                 # Download the first episode of a season for all tv shows
@@ -91,9 +93,9 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
                 # Mainly for testing & debugging
                 skip = True
             if skip:
-                log.debug(f'Skipping {e.title} {e.season}x{e.episode}')
+                log.debug(f'Skipping {title}')
                 continue
-            log.info(f'Uploading "{e.title} {e.season}x{e.episode}"')
+            log.info(f'Uploading "{title}"')
             transmission_rpc.torrent_add(filename=item.find('link').text)
         except ValueError:
             continue
@@ -125,16 +127,9 @@ def postqueue(tv_shows):
         raise ValueError(f'Source "{source}" is not a file')
 
     log.debug(f'Processing file: "{source}"')
-    e = parse_episode(basename(source))
-
-    # Does this TV show already exist (fuzzy match)?
-    G = NGram([d for d in listdir(tv_shows)])
-    found = G.find(e.title, THRESHOLD)
-    title = found if found is not None else e.title
 
     # Create an output filename
-    output = format_episode(e, title)
-    destination = join(tv_shows, title, f'Season {e.season:>02}', output)
+    destination = format_episode(tv_shows, parse_episode(basename(source)))
     log.info(f'Writing "{source}" to "{destination}"')
     if exists(destination):
         raise ValueError(f'Destination "{destination}" already exists')
@@ -156,7 +151,7 @@ def postqueue(tv_shows):
 def rename(rename_dir):
     """Rename all files in the target directory.
 
-    :rename_dir: TODO
+    :rename_dir: Directory to rename files in
 
     """
     # List all files in the directory
@@ -164,7 +159,7 @@ def rename(rename_dir):
         try:
             e = parse_episode(source)
             # Ask user to rename
-            destination = format_episode(e)
+            destination = basename(format_episode(rename_dir, e))
             if source == destination:
                 continue
             if confirm(f'Rename "{source}" to "{destination}"?'):
@@ -173,13 +168,41 @@ def rename(rename_dir):
             continue
 
 
-def format_episode(e, title=None):
-    """ """
-    title = title if title is not None else e.title
-    # Format
+def exists_episode(tv_shows, e):
+    """Check if an episode already exists.
+
+    :tv_shows: Directory where the TV shows are found
+    :e: namedtuple as created by parse_episode()
+    :returns: True if episode already exists, False when not
+
+    """
+    # Get the destination directory name
+    destination_dir = dirname(format_episode(tv_shows, e))
+    if not isdir(destination_dir):
+        return False
+    # Check if the episode is already available by episode number
+    episodes = [parse_episode(f).episode for f in listdir(destination_dir)]
+    return e.episode in episodes
+
+
+def format_episode(tv_shows, e):
+    """Format a file path based on the provided episode information.
+
+    :tv_shows: Directory where the TV shows are found
+    :e: namedtuple as created by parse_episode()
+    :returns: Full path to destination file
+
+    """
+    # Does this TV show already exist (fuzzy match)?
+    G = NGram([d for d in listdir(tv_shows)])
+    found = G.find(e.title, THRESHOLD)
+    title = found if found is not None else e.title
+    # Format the title and trailer
     ti = title.lower().replace(' ', '.')
     tr = e.trailer.lower()
-    return f'{ti}.s{e.season:>02}e{e.episode:>02}.{tr}'
+    # Create the full file path
+    filename = f'{ti}.s{e.season:>02}e{e.episode:>02}.{tr}'
+    return join(tv_shows, title, f'Season {e.season:>02}', filename)
 
 
 def parse_episode(text):
