@@ -50,7 +50,9 @@ def main(log, debug):
 @option('--get-all', is_flag=True, default=False, help='Download all tv shows')
 @option('--no-pilots', is_flag=True, default=False,
         help='Do not download the first episode of a season automatically')
-def prequeue(rss, tv_shows, get_all, no_pilots):
+@option('--no-upload', is_flag=True, default=False,
+        help='Do not upload to Transmission')
+def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
     """Parse an RSS feed for new torrents.
 
     :rss: URL to RSS feed to load
@@ -59,43 +61,43 @@ def prequeue(rss, tv_shows, get_all, no_pilots):
     :no_pilots: Do not download the first episode of a season automatically
 
     """
-    try:
-        # Retrieve the RSS feed
-        response = get(rss)
-        response.raise_for_status()
-        # Load as XML
-        rss = ElementTree.fromstring(response.content)
+    log.info('{s:-^80}'.format(s=' Start simpleget '))
+    # Retrieve the RSS feed
+    response = get(rss)
+    response.raise_for_status()
+    # Load as XML
+    rss = ElementTree.fromstring(response.content)
 
-        # Match each item in the RSS feed to an episode regex
-        G = NGram([d for d in listdir(tv_shows)])
-        transmission_rpc = TransmissionRPC()
-        for item in rss.iter('item'):
-            # Parse title (must be a valid episode name)
-            try:
-                e = parse_episode(item.find('title').text)
+    # Match each item in the RSS feed to an episode regex
+    G = NGram([d for d in listdir(tv_shows)])
+    transmission_rpc = TransmissionRPC()
+    for item in rss.iter('item'):
+        # Parse title (must be a valid episode name)
+        try:
+            e = parse_episode(item.find('title').text)
+            skip = True
+            # Skip any episodes that do not meet the threshold
+            found = G.find(e.title, THRESHOLD)
+            if found is not None:
+                log.info(f'TV show "{e.title}" matched against "{found}"')
+                skip = False
+            if not no_pilots and e.episode == 1:
+                # Download the first episode of a season for all tv shows
+                skip = False
+            if get_all:
+                # Will invalidate any previous conditions
+                skip = False
+            if (no_upload):
+                # Mainly for testing & debugging
                 skip = True
-                # Skip any episodes that do not meet the threshold
-                found = G.find(e.title, THRESHOLD)
-                if found is not None:
-                    log.info(f'TV show "{e.title}" matched against "{found}"')
-                    skip = False
-                if not no_pilots and e.episode == 1:
-                    # Download the first episode of a season for all tv shows
-                    skip = False
-                if get_all:
-                    # Will invalidate any previous conditions
-                    skip = False
-                if skip:
-                    log.debug(f'Skipping {e.title} {e.season}x{e.episode}')
-                    continue
-                log.info(f'Uploading "{e.title} {e.season}x{e.episode}"')
-                transmission_rpc.torrent_add(filename=item.find('link').text)
-            except ValueError:
+            if skip:
+                log.debug(f'Skipping {e.title} {e.season}x{e.episode}')
                 continue
-    except ValueError as e:
-        log.error(e)
-    except ConnectionError as e:
-        log.error(e)
+            log.info(f'Uploading "{e.title} {e.season}x{e.episode}"')
+            transmission_rpc.torrent_add(filename=item.find('link').text)
+        except ValueError:
+            continue
+    log.info('{s:-^80}'.format(s=' Finished simpleget '))
 
 
 @main.command()
@@ -130,8 +132,9 @@ def postqueue(tv_shows):
     title = found if found is not None else e.title
 
     # Create an output filename
-    t = title.lower().replace(' ', '.')
-    output = f'{t}.s{e.season:>02}e{e.episode:>02}.{e.trailer}'
+    ti = title.lower().replace(' ', '.')
+    tr = e.trailer.lower()
+    output = f'{ti}.s{e.season:>02}e{e.episode:>02}.{tr}'
     destination = join(tv_shows, title, f'Season {e.season:>02}', output)
     log.info(f'Writing "{source}" to "{destination}"')
     if exists(destination):
