@@ -118,6 +118,13 @@ def postqueue(tv_shows):
     log.info('{s:-^80}'.format(s=' Start simpleget (postqueue)'))
     filename, directory = (environ['TR_TORRENT_NAME'],
                            environ['TR_TORRENT_DIR'])
+    try:
+        # Sanity check: can the provided filename be parsed by postqueue?
+        parse_episode(filename)
+    except ValueError:
+        log.info(f'"{filename}" cannot be processed by simpleget')
+        log.info('{s:-^80}'.format(s=' Finished simpleget (postqueue) '))
+        return
 
     # Source filename or directory
     path = source = join(directory, filename)
