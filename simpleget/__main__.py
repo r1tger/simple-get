@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 LOG_FORMAT = '[%(levelname)s] [%(relativeCreated)d] %(message)s'
 EPISODES_REGEX = r'(.+)[\. ][s|S]?([0-9]{1,2})[x|X|e|E]([0-9]{2}).*(1080p.*)'
 MOVIES_REGEX = r'(?P<title>.+) \((?P<year>.+)\) \[1080p\]'
-THRESHOLD = 0.7
+THRESHOLD = 0.6
 
 
 @group()
@@ -61,7 +61,7 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
     :no_pilots: Do not download the first episode of a season automatically
 
     """
-    log.info('{s:-^80}'.format(s=' Start simpleget '))
+    log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
     # Retrieve the RSS feed
     response = get(rss)
     response.raise_for_status()
@@ -97,7 +97,7 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
             transmission_rpc.torrent_add(filename=item.find('link').text)
         except ValueError:
             continue
-    log.info('{s:-^80}'.format(s=' Finished simpleget '))
+    log.info('{s:-^80}'.format(s=' Finished simpleget (prequeue) '))
 
 
 @main.command()
@@ -110,6 +110,7 @@ def postqueue(tv_shows):
     :tv_shows: Path to directory where the tv shows are stored
 
     """
+    log.info('{s:-^80}'.format(s=' Start simpleget (postqueue)'))
     filename, directory = (environ['TR_TORRENT_NAME'],
                            environ['TR_TORRENT_DIR'])
 
@@ -148,6 +149,7 @@ def postqueue(tv_shows):
     if isdir(path):
         log.info(f'Removing source directory {path}')
         rmtree(path)
+    log.info('{s:-^80}'.format(s=' Finished simpleget (postqueue) '))
 
 
 def parse_episode(text):
