@@ -79,8 +79,8 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
             destination_dir = dirname(format_episode(tv_shows, e))
             # Process file
             skip = True
-            if isdir(destination_dir) and not exists_episode(tv_shows, e):
-                # Download if destination directory exists, but episode doesn't
+            if isdir(destination_dir):
+                # Download if destination directory exists
                 log.info(f'Matched "{title}"')
                 skip = False
             if not no_pilots and e.episode == 1:
@@ -89,8 +89,11 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
             if get_all:
                 # Will invalidate any previous conditions
                 skip = False
-            if (no_upload):
-                # Mainly for testing & debugging
+            if exists_episode(tv_shows, e):
+                log.info(f'"{title}" already exists, skipping')
+                skip = True
+            if no_upload:
+                # Skip upload by option or if the episode already exists
                 skip = True
             if skip:
                 log.debug(f'Skipping {title}')
