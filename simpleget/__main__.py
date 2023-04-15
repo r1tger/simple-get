@@ -3,7 +3,7 @@
 
 from .transmissionrpc import TransmissionRPC
 
-from click import option, group, argument, Path, File
+from click import option, group, argument, Path, File, confirm
 from requests import get
 from requests.exceptions import ConnectionError
 from xml.etree import ElementTree
@@ -133,9 +133,7 @@ def postqueue(tv_shows):
     title = found if found is not None else e.title
 
     # Create an output filename
-    ti = title.lower().replace(' ', '.')
-    tr = e.trailer.lower()
-    output = f'{ti}.s{e.season:>02}e{e.episode:>02}.{tr}'
+    output = format_episode(e, title)
     destination = join(tv_shows, title, f'Season {e.season:>02}', output)
     log.info(f'Writing "{source}" to "{destination}"')
     if exists(destination):
@@ -150,6 +148,38 @@ def postqueue(tv_shows):
         log.info(f'Removing source directory {path}')
         rmtree(path)
     log.info('{s:-^80}'.format(s=' Finished simpleget (postqueue) '))
+
+
+@main.command()
+@argument('rename-dir', type=Path(exists=True, dir_okay=True,
+          resolve_path=True), default='.')
+def rename(rename_dir):
+    """Rename all files in the target directory.
+
+    :rename_dir: TODO
+
+    """
+    # List all files in the directory
+    for source in [d for d in listdir(rename_dir) if isfile(d)]:
+        try:
+            e = parse_episode(source)
+            # Ask user to rename
+            destination = format_episode(e)
+            if source == destination:
+                continue
+            if confirm(f'Rename "{source}" to "{destination}"?'):
+                move(source, destination)
+        except ValueError:
+            continue
+
+
+def format_episode(e, title=None):
+    """ """
+    title = title if title is not None else e.title
+    # Format
+    ti = title.lower().replace(' ', '.')
+    tr = e.trailer.lower()
+    return f'{ti}.s{e.season:>02}e{e.episode:>02}.{tr}'
 
 
 def parse_episode(text):
