@@ -81,7 +81,7 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
             skip = True
             if isdir(destination_dir):
                 # Download if destination directory exists
-                log.info(f'Matched "{title}"')
+                log.debug(f'Matched "{title}"')
                 skip = False
             if not no_pilots and e.episode == 1:
                 # Download the first episode of a season for all tv shows
@@ -98,7 +98,7 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
             if skip:
                 log.debug(f'Skipping {title}')
                 continue
-            log.info(f'Uploading "{title}"')
+            log.info(f'Uploading "{title}" to Transmission')
             transmission_rpc.torrent_add(filename=item.find('link').text)
         except ValueError:
             continue
