@@ -5,8 +5,6 @@ from .transmissionrpc import TransmissionRPC
 
 from click import option, group, argument, Path, File, confirm
 from requests import get
-from requests.exceptions import ConnectionError
-from xml.etree import ElementTree
 from re import match, I
 from ngram import NGram
 from collections import namedtuple
@@ -14,6 +12,7 @@ from os import listdir, environ, makedirs, chdir
 from os.path import join, isfile, isdir, getsize, dirname, basename, exists
 from shutil import rmtree, move
 from pprint import pprint
+from json import loads
 
 import logging
 log = logging.getLogger(__name__)
@@ -43,7 +42,7 @@ def main(log, debug):
 
 
 @main.command()
-@argument('rss')
+@argument('url')
 @option('--tv-shows', type=Path(exists=True, dir_okay=True,
         resolve_path=True), help='Target directory containing the tv shows',
         default='.')
@@ -52,28 +51,29 @@ def main(log, debug):
         help='Do not download the first episode of a season automatically')
 @option('--no-upload', is_flag=True, default=False,
         help='Do not upload to Transmission')
-def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
+def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
     """Parse an RSS feed for new torrents.
 
-    :rss: URL to RSS feed to load
+    :url: URL to torrents json to load
     :tv_shows: Path to directory where the tv shows are stored
     :get_all: Retrieve all episodes, even if they're not in TV Shows
     :no_pilots: Do not download the first episode of a season automatically
 
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
-    # Retrieve the RSS feed
-    response = get(rss)
+    # Retrieve the URL
+    response = get(url)
     response.raise_for_status()
-    # Load as XML
-    rss = ElementTree.fromstring(response.content)
+    log.info(f'Retrieved torrents from "{url}"')
+    # Load as json
+    torrents = loads(response.content)
 
     # Match each item in the RSS feed to an episode regex
     transmission_rpc = TransmissionRPC()
-    for item in rss.iter('item'):
+    for item in torrents['torrents']:
         # Parse title (must be a valid episode name)
         try:
-            title = item.find('title').text
+            title = item['title']
             # Process episode
             e = parse_episode(title)
             destination_dir = dirname(format_episode(tv_shows, e))
@@ -96,10 +96,10 @@ def prequeue(rss, tv_shows, get_all, no_pilots, no_upload):
                 # Skip upload by option or if the episode already exists
                 skip = True
             if skip:
-                log.debug(f'Skipping {title}')
+                log.debug(f'Skipping "{title}"')
                 continue
             log.info(f'Uploading "{title}" to Transmission')
-            transmission_rpc.torrent_add(filename=item.find('link').text)
+            transmission_rpc.torrent_add(filename=item['magnet_url'])
         except ValueError:
             continue
     log.info('{s:-^80}'.format(s=' Finished simpleget (prequeue) '))

@@ -15,7 +15,7 @@ class RSSServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/xml')
         self.end_headers()
-        with open('all.rss', 'rb') as f:
+        with open('get-torrents.json', 'rb') as f:
             self.wfile.write(f.read())
 
 
@@ -47,8 +47,7 @@ def test_prequeue(tv_shows, caplog):
     runner = CliRunner()
     result = runner.invoke(prequeue,
                            ['--tv-shows', tv_shows, '--no-upload',
-                            'http://localhost:8080/all.rss'])
-    print(caplog.text)
+                            'http://localhost:8080/get-torrents.json'])
     # Clean up
     server.shutdown()
     server_thread.join()
