@@ -62,7 +62,7 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
 
-    transmission_rpc = TransmissionRPC('192.168.1.2')
+    transmission_rpc = TransmissionRPC()
     found = []
     # Retrieve all active torrents from Transmission
     for t in transmission_rpc.torrent_get(fields=['id', 'name'])['torrents']:
