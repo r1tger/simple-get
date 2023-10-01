@@ -61,16 +61,24 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
 
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
+
+    transmission_rpc = TransmissionRPC()
+    found = []
+    # Retrieve all active torrents from Transmission
+    for t in transmission_rpc.torrent_get(fields=['id', 'name'])['torrents']:
+        try:
+            # Create a list of Episodes for each valid torrent name
+            found.append(parse_episode(t['name']))
+        except ValueError:
+            continue
+
     # Retrieve the URL
     response = get(url)
     response.raise_for_status()
     log.info(f'Retrieved torrents from "{url}"')
-    # Load as json
-    torrents = loads(response.content)
 
     # Match each item in the RSS feed to an episode regex
-    transmission_rpc = TransmissionRPC()
-    for item in torrents['torrents']:
+    for item in loads(response.content)['torrents']:
         # Parse title (must be a valid episode name)
         try:
             title = item['title']
@@ -89,17 +97,15 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
             if get_all:
                 # Will invalidate any previous conditions
                 skip = False
-            if exists_episode(tv_shows, e):
+            if e in found or exists_episode(tv_shows, e):
                 log.info(f'"{title}" already exists, skipping')
-                skip = True
-            if no_upload:
-                # Skip upload by option or if the episode already exists
                 skip = True
             if skip:
                 log.debug(f'Skipping "{title}"')
                 continue
             log.info(f'Uploading "{title}" to Transmission')
-            transmission_rpc.torrent_add(filename=item['magnet_url'])
+            if not no_upload:
+                transmission_rpc.torrent_add(filename=item['magnet_url'])
         except ValueError:
             continue
     log.info('{s:-^80}'.format(s=' Finished simpleget (prequeue) '))
@@ -185,6 +191,8 @@ def exists_episode(tv_shows, e):
     :e: namedtuple as created by parse_episode()
     :returns: True if episode already exists, False when not
 
+    TODO: cache the created Episodes
+
     """
     # Get the destination directory name
     destination_dir = dirname(format_episode(tv_shows, e))
@@ -227,7 +235,15 @@ def parse_episode(text):
     if (m is None):
         raise ValueError(f'"{text}" is not a valid episode')
     # Store matched episode
-    episode = namedtuple('Episode', ['title', 'season', 'episode', 'trailer'])
+    episode = namedtuple('episode', ['title', 'season', 'episode', 'trailer'])
+
+    class Episode(episode):
+        """ Helper class to match Episodes more broadly. """
+        def __eq__(self, other):
+            return (NGram.compare(self.title, other.title) > THRESHOLD and
+                    self.season == other.season and
+                    self.episode == other.episode)
+
     # Clean up title
     title = m.group(1).replace('_', ' ').replace('.', ' ').title()
-    return episode(title, int(m.group(2)), int(m.group(3)), m.group(4))
+    return Episode(title, int(m.group(2)), int(m.group(3)), m.group(4))

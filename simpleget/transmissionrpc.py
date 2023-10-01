@@ -9,8 +9,8 @@ except ImportError:
 
 class TransmissionRPC(dict):
     """ Wrap the Transmission JSON API """
-    def __init__(self, host='localhost', port=9091, username=False,
-                 password=False):
+    def __init__(self, host='localhost', port=9091, username='',
+                 password=''):
         self.url = f'http://{host}:{port}/transmission/rpc'
         self.username = username
         self.password = password
@@ -43,4 +43,4 @@ class TransmissionRPC(dict):
         rv = response.json()
         if 'success' != rv['result']:
             raise ValueError(rv['result'])
-        return rv
+        return rv['arguments']
