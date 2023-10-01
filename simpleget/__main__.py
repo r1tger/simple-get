@@ -62,7 +62,7 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
 
-    transmission_rpc = TransmissionRPC()
+    transmission_rpc = TransmissionRPC('192.168.1.2')
     found = []
     # Retrieve all active torrents from Transmission
     for t in transmission_rpc.torrent_get(fields=['id', 'name'])['torrents']:
@@ -104,6 +104,7 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
                 log.debug(f'Skipping "{title}"')
                 continue
             log.info(f'Uploading "{title}" to Transmission')
+            found.append(e)
             if not no_upload:
                 transmission_rpc.torrent_add(filename=item['magnet_url'])
         except ValueError:
