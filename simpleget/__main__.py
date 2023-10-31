@@ -4,15 +4,13 @@
 from .transmissionrpc import TransmissionRPC
 
 from click import option, group, argument, Path, File, confirm
-from requests import get
-from re import match, I
-from ngram import NGram
 from collections import namedtuple
+from feedparser import parse
+from ngram import NGram
 from os import listdir, environ, makedirs, chdir
 from os.path import join, isfile, isdir, getsize, dirname, basename, exists
+from re import match, I
 from shutil import rmtree, move
-from pprint import pprint
-from json import loads
 
 import logging
 log = logging.getLogger(__name__)
@@ -63,22 +61,15 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
 
     transmission_rpc = TransmissionRPC()
-    found = []
-    # Retrieve all active torrents from Transmission
-    for t in transmission_rpc.torrent_get(fields=['id', 'name'])['torrents']:
-        try:
-            # Create a list of Episodes for each valid torrent name
-            found.append(parse_episode(t['name']))
-        except ValueError:
-            continue
+    # Find all episodes already available in Transmission
+    found = transmission_episode(transmission_rpc) if not no_upload else []
 
     # Retrieve the URL
-    response = get(url)
-    response.raise_for_status()
+    response = parse(url)
     log.info(f'Retrieved torrents from "{url}"')
 
     # Match each item in the RSS feed to an episode regex
-    for item in loads(response.content)['torrents']:
+    for item in response['entries']:
         # Parse title (must be a valid episode name)
         try:
             title = item['title']
@@ -106,7 +97,7 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
             log.info(f'Uploading "{title}" to Transmission')
             found.append(e)
             if not no_upload:
-                transmission_rpc.torrent_add(filename=item['magnet_url'])
+                transmission_rpc.torrent_add(filename=item['link'])
         except ValueError:
             continue
     log.info('{s:-^80}'.format(s=' Finished simpleget (prequeue) '))
@@ -248,3 +239,17 @@ def parse_episode(text):
     # Clean up title
     title = m.group(1).replace('_', ' ').replace('.', ' ').title()
     return Episode(title, int(m.group(2)), int(m.group(3)), m.group(4))
+
+
+def transmission_episode(transmission_rpc):
+    """Get all episodes already in Transmission.
+    """
+    found = []
+    # Retrieve all active torrents from Transmission
+    for t in transmission_rpc.torrent_get(fields=['id', 'name'])['torrents']:
+        try:
+            # Create a list of Episodes for each valid torrent name
+            found.append(parse_episode(t['name']))
+        except ValueError:
+            continue
+    return found
