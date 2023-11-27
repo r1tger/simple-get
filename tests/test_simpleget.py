@@ -22,7 +22,7 @@ class RSSServer(BaseHTTPRequestHandler):
 @pytest.fixture
 def tv_shows(tmpdir, caplog):
     """ Set up simple-get environment """
-    caplog.set_level(logging.INFO, logger='simpleget.__main__')
+    caplog.set_level(logging.DEBUG, logger='simpleget.__main__')
     test_dir = tmpdir.mkdir('simpleget')
     tv_shows = ['Greys Anatomy/Season 19', 'Yellowjackets',
                 'The Walking Dead', 'The Talking Dead']
@@ -65,12 +65,11 @@ def test_postqueue_directory(tv_shows, caplog, tmpdir):
     makedirs(dirname(source))
     with open(source, 'w'):
         pass
-    # Set up postqueue environment
-    environ['TR_TORRENT_NAME'] = torrent_name
-    environ['TR_TORRENT_DIR'] = str(torrent_dir)
     # Test postqueue command
     runner = CliRunner()
-    result = runner.invoke(postqueue, ['--tv-shows', tv_shows])
+    result = runner.invoke(postqueue, ['--tv-shows', tv_shows,
+                                       '--filename', torrent_name,
+                                       '--directory', str(torrent_dir)])
     print(caplog.text)
     # Asserts
     assert(result.exit_code == 0)
@@ -88,12 +87,11 @@ def test_postqueue_file(tv_shows, caplog, tmpdir):
     source = join(torrent_dir, torrent_name)
     with open(source, 'w'):
         pass
-    # Set up postqueue environment
-    environ['TR_TORRENT_NAME'] = torrent_name
-    environ['TR_TORRENT_DIR'] = str(torrent_dir)
     # Test postqueue command
     runner = CliRunner()
-    result = runner.invoke(postqueue, ['--tv-shows', tv_shows])
+    result = runner.invoke(postqueue, ['--tv-shows', tv_shows,
+                                       '--filename', torrent_name,
+                                       '--directory', str(torrent_dir)])
     print(caplog.text)
     # Asserts
     assert(result.exit_code == 0)

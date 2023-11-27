@@ -7,7 +7,7 @@ from click import option, group, argument, Path, File, confirm
 from collections import namedtuple
 from feedparser import parse
 from ngram import NGram
-from os import listdir, environ, makedirs, chdir
+from os import listdir, makedirs, chdir
 from os.path import join, isfile, isdir, getsize, dirname, basename, exists
 from re import match, I
 from shutil import rmtree, move
@@ -107,15 +107,20 @@ def prequeue(url, tv_shows, get_all, no_pilots, no_upload):
 @option('--tv-shows', type=Path(exists=True, dir_okay=True,
         resolve_path=True), help='Target directory containing the tv shows',
         default='.')
-def postqueue(tv_shows):
+@option('--filename', type=Path(),
+        help='File to process')
+@option('--directory', type=Path(), default='',
+        help='Directory containing file to process')
+def postqueue(tv_shows, filename, directory):
     """Move files upon download by transmission.
 
     :tv_shows: Path to directory where the tv shows are stored
+    :filename: Filename to process. Can be a relative path (use directory to
+        complete path to file) or absolute
+    :directory: Directory to process, or to find filename
 
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (postqueue)'))
-    filename, directory = (environ['TR_TORRENT_NAME'],
-                           environ['TR_TORRENT_DIR'])
     try:
         # Sanity check: can the provided filename be parsed by postqueue?
         parse_episode(filename)
@@ -135,6 +140,7 @@ def postqueue(tv_shows):
         raise ValueError(f'Source "{source}" is not a file')
 
     log.debug(f'Processing file: "{source}"')
+    print(f'Processing file: "{source}"')
 
     # Create an output filename
     destination = format_episode(tv_shows, parse_episode(basename(source)))
