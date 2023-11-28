@@ -162,7 +162,6 @@ def postqueue(tv_shows, filename, directory):
         raise ValueError(f'Source "{source}" is not a file')
 
     log.debug(f'Processing file: "{source}"')
-    print(f'Processing file: "{source}"')
 
     # Create an output filename
     destination = format_episode(tv_shows, parse_episode(basename(source)))
