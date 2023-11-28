@@ -13,7 +13,7 @@ class RSSServer(BaseHTTPRequestHandler):
     def do_GET(self):
         """ """
         self.send_response(200)
-        self.send_header('Content-type', 'text/rss')
+        self.send_header('Content-type', 'text/xml')
         self.end_headers()
         with open('all.rss', 'rb') as f:
             self.wfile.write(f.read())
