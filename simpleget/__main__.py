@@ -96,8 +96,8 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
                 # Download if destination directory exists
                 log.debug(f'Matched "{title}"')
                 skip = False
-            if not no_pilots and e.episode == 1:
-                # Download the first episode of a season for all tv shows
+            if not no_pilots and e.season == 1 and e.episode == 1:
+                # Download the first episode of a new tv show
                 skip = False
             if get_all:
                 # Will invalidate any previous conditions
