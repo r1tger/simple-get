@@ -24,14 +24,15 @@ def tv_shows(tmpdir, caplog):
     """ Set up simple-get environment """
     caplog.set_level(logging.DEBUG, logger='simpleget.__main__')
     test_dir = tmpdir.mkdir('simpleget')
-    tv_shows = ['Greys Anatomy/Season 19', 'Yellowjackets',
-                'The Walking Dead', 'The Talking Dead']
+    tv_shows = ['30 Coins/Season 02', 'Yellowjackets', 'The Walking Dead',
+                'The Talking Dead']
     # Create directory of TV Shows
     for tv_show in tv_shows:
         makedirs(join(test_dir, tv_show))
     # Create a dummy file to test episode existence
-    with open(join(test_dir, 'Greys Anatomy/Season 19',
-                   'greys.anatomy.s19e14.1080p.x264-cakes.mkv'), 'w'):
+    with open(join(test_dir, '30 Coins/Season 02',
+                   '30.coins.s02e06.1080p.amzn.web-dl.ddp5.1.h.264-ntb.mkv'),
+              'w'):
         pass
     # Make directory available to tests
     return test_dir

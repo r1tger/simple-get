@@ -22,6 +22,9 @@ EPISODES_REGEX = r'(.+)[\. ][s|S]?([0-9]{1,2})[x|X|e|E]([0-9]{2}).*(1080p.*)'
 MOVIES_REGEX = r'(?P<title>.+) \((?P<year>.+)\) \[1080p\]'
 THRESHOLD = 0.6
 
+# Found episodes for this run. Includes nzbs from nzbget and files on disk
+found = []
+
 
 @group()
 @option('--log', type=File(mode='a'), help='Filename for log file')
@@ -65,15 +68,8 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
 
-    found = []
-    if not no_upload:
-        nzbget = ServerProxy(nzbget_url)
-        # Include nzbs already being downloaded to prevent re-uploading
-        for nzb in nzbget.listgroups(0):
-            try:
-                found.append(parse_episode(nzb['NZBNicename']))
-            except ValueError:
-                continue
+    # NZBGet rpc-xml API
+    nzbget = False if no_upload else ServerProxy(nzbget_url)
 
     # Retrieve the URL
     response = parse(url)
@@ -102,7 +98,7 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
             if get_all:
                 # Will invalidate any previous conditions
                 skip = False
-            if e in found or exists_episode(tv_shows, e):
+            if exists_episode(tv_shows, e, nzbget):
                 log.info(f'"{title}" already exists, skipping')
                 skip = True
             if skip:
@@ -110,7 +106,7 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
                 continue
             log.info(f'Uploading "{title}" to nzbget')
             found.append(e)
-            if not no_upload:
+            if nzbget:
                 # Special stupidity: add .nzb to title, otherwise nzbget skips
                 # the URL as "not being an NZB"
                 title = title if title.endswith('.nzb') else title + '.nzb'
@@ -203,23 +199,44 @@ def rename(rename_dir):
             continue
 
 
-def exists_episode(tv_shows, e):
-    """Check if an episode already exists.
+def exists_episode(tv_shows, e, nzbget=False):
+    """Check if an episode already exists. NZBGet queue/history is checked
+    first to prevent spinning up the disk to check for file existence.
 
     :tv_shows: Directory where the TV shows are found
     :e: namedtuple as created by parse_episode()
+    :nzbget: ServerProxy instance to nzbget API. Ignored when False
     :returns: True if episode already exists, False when not
 
-    TODO: cache the created Episodes
-
     """
-    # Get the destination directory name
+    # Parsing is expensive with larger queues, only do this once
+    if nzbget and len(found) == 0:
+        # Get both download queue and history
+        groups = nzbget.listgroups(0)
+        groups += nzbget.history(False)
+
+        # Include nzbs in groups to prevent re-uploading
+        for nzb in groups:
+            try:
+                episode = parse_episode(nzb['NZBNicename'])
+                if episode not in found:
+                    found.append(episode)
+            except ValueError:
+                continue
+    # Check if e is in found, to prevent going to disk
+    if e in found:
+        return True
+    # Get the destination directory name for the tv show
     destination_dir = dirname(format_episode(tv_shows, e))
     if not isdir(destination_dir):
         return False
     # Check if the episode is already available by episode number
-    episodes = [parse_episode(f).episode for f in listdir(destination_dir)]
-    return e.episode in episodes
+    for f in listdir(destination_dir):
+        episode = parse_episode(f)
+        if episode not in found:
+            found.append(episode)
+    # Final check if episode exists
+    return e in found
 
 
 def format_episode(tv_shows, e):
