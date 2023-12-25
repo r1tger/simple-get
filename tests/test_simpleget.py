@@ -101,3 +101,27 @@ def test_postqueue_file(tv_shows, caplog, tmpdir):
     assert(isfile(destination))
     assert(not isfile(source))
     assert(isdir(torrent_dir))
+
+
+def test_postqueue_file_obfuscated(tv_shows, caplog, tmpdir):
+    """ """
+    # Create torrent directory with video file
+    torrent_name = 'Star.Trek.Picard.S03E09.1080p.WEB.H264-CAKES[rarbg]'
+    torrent_dir = tmpdir.mkdir('bt')
+    source = join(torrent_dir, torrent_name,
+                  '0f9c374002dcc756021fa13b3824e8ce.mkv')
+    makedirs(dirname(source))
+    with open(source, 'w'):
+        pass
+    # Test postqueue command
+    runner = CliRunner()
+    result = runner.invoke(postqueue, ['--tv-shows', tv_shows,
+                                       '--filename', torrent_name,
+                                       '--directory', str(torrent_dir)])
+    print(caplog.text)
+    # Asserts
+    assert(result.exit_code == 0)
+    destination = join(tv_shows, 'Star Trek Picard', 'Season 03',
+                       'star.trek.picard.s03e09.1080p.web.h264-cakes[rarbg].mkv')
+    assert(isfile(destination))
+    assert(not isdir(dirname(source)))

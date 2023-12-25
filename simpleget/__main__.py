@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from .transmissionrpc import TransmissionRPC
-
 from click import option, group, argument, Path, File, confirm
 from collections import namedtuple
 from feedparser import parse
 from ngram import NGram
 from os import listdir, makedirs, chdir
-from os.path import join, isfile, isdir, getsize, dirname, basename, exists
+from os.path import (join, isfile, isdir, getsize, dirname, basename, exists,
+                     splitext)
 from re import match, I
 from shutil import rmtree, move
 from xmlrpc.client import ServerProxy
@@ -139,13 +138,6 @@ def postqueue(tv_shows, filename, directory):
 
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (postqueue)'))
-    try:
-        # Sanity check: can the provided filename be parsed by postqueue?
-        parse_episode(filename)
-    except ValueError:
-        log.info(f'"{filename}" cannot be processed by simpleget')
-        log.info('{s:-^80}'.format(s=' Finished simpleget (postqueue) '))
-        return
 
     # Source filename or directory
     path = source = join(directory, filename)
@@ -157,10 +149,28 @@ def postqueue(tv_shows, filename, directory):
     if not isfile(source):
         raise ValueError(f'Source "{source}" is not a file')
 
-    log.debug(f'Processing file: "{source}"')
+    # Try to find any part of the path to use as episode. Some downloads will
+    # have a filename that is obfuscated, but the source directory is usable as
+    # episode.
+    e = False
+    for p in reversed(source.split('/')):
+        try:
+            # Try to parse the path component
+            e = parse_episode(p)
+            break
+        except ValueError:
+            continue
+    if not e:
+        raise ValueError(f'Source "{source}" could not be parsed')
 
+    log.debug(f'Processing file: "{source}" as "{e}"')
+
+    # Get the extension for the filename
+    _, ext = splitext(source)
     # Create an output filename
-    _, destination = format_episode(tv_shows, parse_episode(basename(source)))
+    _, destination = format_episode(tv_shows, e)
+    if not destination.endswith(ext):
+        destination += ext
     log.info(f'Writing "{source}" to "{destination}"')
     if exists(destination):
         raise ValueError(f'Destination "{destination}" already exists')
