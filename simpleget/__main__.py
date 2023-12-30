@@ -123,8 +123,7 @@ def prequeue(url, library, nzbget_url, get_all, no_pilots,
 @main.command()
 @option('--library', type=Path(exists=True, dir_okay=True, resolve_path=True),
         help='Library containing TV Shows', multiple=True)
-@option('--filename', type=Path(),
-        help='File to process')
+@option('--filename', default='', help='File to process')
 @option('--directory', type=Path(), default='',
         help='Directory containing file to process')
 def postqueue(library, filename, directory):
@@ -226,7 +225,7 @@ def exists_series(library, title):
     return None
 
 
-def exists_episode(library, e, nzbget=False):
+def exists_episode(library, e, nzbget=None):
     """Check if an episode already exists. NZBGet queue/history is checked
     first to prevent spinning up the disk to check for file existence.
 

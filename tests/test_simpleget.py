@@ -59,7 +59,7 @@ def test_prequeue(tv_shows, caplog):
 def test_postqueue_directory(tv_shows, caplog, tmpdir):
     """ """
     # Create torrent directory with video file
-    torrent_name = 'Star.Trek.Picard.S03E09.1080p.WEB.H264-CAKES[rarbg]'
+    torrent_name = 'Star.Trek.Picard.S03E09.1080p.WEB.H264-CAKES[rarbg]/'
     torrent_dir = tmpdir.mkdir('bt')
     source = join(torrent_dir, torrent_name,
                   'Star.Trek.Picard.S03E09.1080p.WEB.H264-CAKES.mkv')
@@ -69,8 +69,7 @@ def test_postqueue_directory(tv_shows, caplog, tmpdir):
     # Test postqueue command
     runner = CliRunner()
     result = runner.invoke(postqueue, ['--library', tv_shows,
-                                       '--filename', torrent_name,
-                                       '--directory', str(torrent_dir)])
+                                       '--directory', dirname(source)])
     print(caplog.text)
     # Asserts
     assert(result.exit_code == 0)
@@ -106,7 +105,7 @@ def test_postqueue_file(tv_shows, caplog, tmpdir):
 def test_postqueue_file_obfuscated(tv_shows, caplog, tmpdir):
     """ """
     # Create torrent directory with video file
-    torrent_name = 'Star.Trek.Picard.S03E09.1080p.WEB.H264-CAKES[rarbg]'
+    torrent_name = 'Star.Trek.Picard.S03E09.1080p.WEB.H264-CAKES[rarbg]/'
     torrent_dir = tmpdir.mkdir('bt')
     source = join(torrent_dir, torrent_name,
                   '0f9c374002dcc756021fa13b3824e8ce.mkv')
@@ -116,8 +115,7 @@ def test_postqueue_file_obfuscated(tv_shows, caplog, tmpdir):
     # Test postqueue command
     runner = CliRunner()
     result = runner.invoke(postqueue, ['--library', tv_shows,
-                                       '--filename', torrent_name,
-                                       '--directory', str(torrent_dir)])
+                                       '--directory', dirname(source)])
     print(caplog.text)
     # Asserts
     assert(result.exit_code == 0)
