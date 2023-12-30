@@ -5,9 +5,10 @@ from click import option, group, argument, Path, File, confirm
 from collections import namedtuple
 from feedparser import parse
 from ngram import NGram
-from os import listdir, makedirs, chdir
+from os import listdir, makedirs, chdir, remove
 from os.path import (join, isfile, isdir, getsize, dirname, basename, exists,
-                     splitext)
+                     splitext, getmtime)
+from datetime import date, timedelta
 from re import match, I
 from glob import iglob, escape
 from shutil import rmtree, move
@@ -205,6 +206,40 @@ def rename(rename_dir):
                 move(source, destination)
         except ValueError:
             continue
+
+
+@main.command()
+@option('--library', type=Path(exists=True, dir_okay=True, resolve_path=True),
+        help='Library containing TV Shows', multiple=True)
+@option('--days', type=int, default=30, help='Maximum age of files')
+@option('--delete', is_flag=True, help='Simulate deletion of directories')
+def purge(library, days, delete):
+    """Purge any files older than [days] from all provided library directories.
+
+    :library: Multiple paths to directories containing TV Shows
+    :days: Maximum age of directory, in days
+
+    """
+    cut_off = date.today() - timedelta(days=days)
+    log.info('{s:-^80}'.format(s=' Start simpleget (purge)'))
+    log.info(f'Purging all files over "{days}" days of age ({cut_off})')
+    for d in library:
+        found = []
+        # Get all files and directories
+        for f in iglob(escape(d) + '/**/*', recursive=True):
+            # Skip files
+            if isdir(f):
+                continue
+            # Get last modification date
+            mtime = date.fromtimestamp(getmtime(f))
+            if mtime < cut_off:
+                found.append((f, mtime))
+        for f, mtime in found:
+            log.info(f'Deleting file "{f}" ({mtime})')
+            # Delete the directory
+            if delete:
+                remove(f)
+    log.info('{s:-^80}'.format(s=' Finished simpleget (purge) '))
 
 
 def exists_series(library, title):
