@@ -7,7 +7,7 @@ from feedparser import parse
 from ngram import NGram
 from os import listdir, makedirs, chdir, remove
 from os.path import (join, isfile, isdir, getsize, dirname, basename, exists,
-                     splitext, getmtime)
+                     splitext, getctime)
 from datetime import date, timedelta
 from re import match, I
 from glob import iglob, escape
@@ -231,11 +231,11 @@ def purge(library, days, delete):
             if isdir(f):
                 continue
             # Get last modification date
-            mtime = date.fromtimestamp(getmtime(f))
-            if mtime < cut_off:
-                found.append((f, mtime))
-        for f, mtime in found:
-            log.info(f'Deleting file "{f}" ({mtime})')
+            ctime = date.fromtimestamp(getctime(f))
+            if ctime < cut_off:
+                found.append((f, ctime))
+        for f, ctime in found:
+            log.info(f'Deleting file "{f}" ({ctime})')
             # Delete the directory
             if delete:
                 remove(f)
