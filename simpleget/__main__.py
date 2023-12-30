@@ -9,6 +9,7 @@ from os import listdir, makedirs, chdir
 from os.path import (join, isfile, isdir, getsize, dirname, basename, exists,
                      splitext)
 from re import match, I
+from glob import iglob, escape
 from shutil import rmtree, move
 from xmlrpc.client import ServerProxy
 from pprint import pprint
@@ -45,9 +46,8 @@ def main(log, debug):
 
 @main.command()
 @argument('url')
-@option('--tv-shows', type=Path(exists=True, dir_okay=True,
-        resolve_path=True), help='Target directory containing the tv shows',
-        default='.')
+@option('--library', type=Path(exists=True, dir_okay=True, resolve_path=True),
+        help='Library containing TV Shows', multiple=True)
 @option('--nzbget-url', default='http://apricot:6789/xmlrpc',
         help='Full URL to nzbget xmlrpc interface')
 @option('--get-all', is_flag=True, default=False, help='Download all tv shows')
@@ -55,11 +55,12 @@ def main(log, debug):
         help='Do not download the first episode of a season automatically')
 @option('--no-upload', is_flag=True, default=False,
         help='Do not upload to Transmission')
-def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
+def prequeue(url, library, nzbget_url, get_all, no_pilots,
+             no_upload):
     """Parse an RSS feed for new nzbs.
 
     :url: URL to NZB RSS to load
-    :tv_shows: Path to directory where the tv shows are stored
+    :library: Multiple paths to directories containing TV Shows
     :nzbget_url: URL to nzbget xmlrpc interface
     :get_all: Retrieve all episodes, even if they're not in TV Shows
     :no_pilots: Do not download the first episode of a season automatically
@@ -68,7 +69,7 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
 
     # NZBGet rpc-xml API
-    nzbget = False if no_upload else ServerProxy(nzbget_url)
+    nzbget = None if no_upload else ServerProxy(nzbget_url)
 
     # Retrieve the URL
     response = parse(url)
@@ -84,10 +85,9 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
             log.debug(f'Processing "{title}"')
             # Process episode
             e = parse_episode(title)
-            destination_dir, _ = format_episode(tv_shows, e)
             # Process file
             skip = True
-            if isdir(destination_dir):
+            if exists_series(library, e.title):
                 # Download if destination directory exists
                 log.debug(f'Matched "{title}"')
                 skip = False
@@ -97,7 +97,7 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
             if get_all:
                 # Will invalidate any previous conditions
                 skip = False
-            if exists_episode(tv_shows, e, nzbget):
+            if exists_episode(library, e, nzbget):
                 log.info(f'"{title}" already exists, skipping')
                 skip = True
             if skip:
@@ -121,17 +121,16 @@ def prequeue(url, tv_shows, nzbget_url, get_all, no_pilots, no_upload):
 
 
 @main.command()
-@option('--tv-shows', type=Path(exists=True, dir_okay=True,
-        resolve_path=True), help='Target directory containing the tv shows',
-        default='.')
+@option('--library', type=Path(exists=True, dir_okay=True, resolve_path=True),
+        help='Library containing TV Shows', multiple=True)
 @option('--filename', type=Path(),
         help='File to process')
 @option('--directory', type=Path(), default='',
         help='Directory containing file to process')
-def postqueue(tv_shows, filename, directory):
+def postqueue(library, filename, directory):
     """Move files upon download by transmission.
 
-    :tv_shows: Path to directory where the tv shows are stored
+    :library: Multiple paths to directories containing TV Shows
     :filename: Filename to process. Can be a relative path (use directory to
         complete path to file) or absolute
     :directory: Directory to process, or to find filename
@@ -165,10 +164,10 @@ def postqueue(tv_shows, filename, directory):
 
     log.debug(f'Processing file: "{source}" as "{e}"')
 
-    # Get the extension for the filename
+    # Get the extension for the filename (includes leading '.')
     _, ext = splitext(source)
     # Create an output filename
-    _, destination = format_episode(tv_shows, e)
+    destination = format_episode(library, e)
     if not destination.endswith(ext):
         destination += ext
     log.info(f'Writing "{source}" to "{destination}"')
@@ -200,7 +199,7 @@ def rename(rename_dir):
         try:
             e = parse_episode(source)
             # Ask user to rename
-            destination = basename(format_episode(rename_dir, e)[1])
+            destination = basename(format_episode([rename_dir], e))
             if source == destination:
                 continue
             if confirm(f'Rename "{source}" to "{destination}"?'):
@@ -209,14 +208,36 @@ def rename(rename_dir):
             continue
 
 
-def exists_episode(tv_shows, e, nzbget=False):
+def exists_series(library, title):
+    """Check if a series already exists. A series exists if a directory for the
+    series is found in any of the library directories.
+
+    :library: List of directories where the TV shows are found
+    :title: Title of series to check
+    :returns: Full path to series if series exists, None when not
+
+    """
+    for d in library:
+        # Does this TV show already exist (fuzzy match)?
+        G = NGram(listdir(d))
+        found = G.find(title, THRESHOLD)
+        if found is not None:
+            return join(d, found)
+    return None
+
+
+def exists_episode(library, e, nzbget=False):
     """Check if an episode already exists. NZBGet queue/history is checked
     first to prevent spinning up the disk to check for file existence.
 
-    :tv_shows: Directory where the TV shows are found
+    Note that the interface for exists_episode() is not theV same as
+    exists_series(), due to matching on Episode namedtuples. A path cannot be
+    returned in that specific scenario.
+
+    :library: List of directories where the TV shows are found
     :e: namedtuple as created by parse_episode()
     :nzbget: ServerProxy instance to nzbget API. Ignored when False
-    :returns: True if episode already exists, False when not
+    :returns: True when episode exists, False when not
 
     """
     # Parsing is expensive with larger queues, only do this once
@@ -237,37 +258,39 @@ def exists_episode(tv_shows, e, nzbget=False):
     if e in found:
         return True
     # Get the destination directory name for the tv show
-    destination_dir = dirname(format_episode(tv_shows, e)[1])
-    if not isdir(destination_dir):
+    destination_dir = exists_series(library, e.title)
+    if destination_dir is None:
         return False
     # Check if the episode is already available by episode number
-    for f in listdir(destination_dir):
-        episode = parse_episode(f)
-        if episode not in found:
-            found.append(episode)
+    for f in iglob(escape(destination_dir) + '/**/*', recursive=True):
+        try:
+            episode = parse_episode(basename(f))
+            if episode not in found:
+                found.append(episode)
+        except ValueError:
+            continue
     # Final check if episode exists
     return e in found
 
 
-def format_episode(tv_shows, e):
+def format_episode(library, e):
     """Format a file path based on the provided episode information.
 
-    :tv_shows: Directory where the TV shows are found
+    :library: List of directories where the TV shows are found
     :e: namedtuple as created by parse_episode()
-    :returns: tuple containing (full path to TV show,
-                                full path to destination file)
+    :returns: full path to destination file)
     """
-    # Does this TV show already exist (fuzzy match)?
-    G = NGram([d for d in listdir(tv_shows)])
-    found = G.find(e.title, THRESHOLD)
-    title = found if found is not None else e.title
+    # Check if the series can be found in the library
+    destination_dir = exists_series(library, e.title)
+    if destination_dir is None:
+        # Series not found, write to first (primary) directory in library
+        destination_dir = join(library[0], e.title)
     # Format the title and trailer
-    ti = title.lower().replace(' ', '.')
+    ti = e.title.lower().replace(' ', '.')
     tr = e.trailer.lower()
     # Create the full file path
     filename = f'{ti}.s{e.season:>02}e{e.episode:>02}.{tr}'
-    return (join(tv_shows, title),
-            join(tv_shows, title, f'Season {e.season:>02}', filename))
+    return join(destination_dir, f'Season {e.season:>02}', filename)
 
 
 def parse_episode(text):

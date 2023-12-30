@@ -47,7 +47,7 @@ def test_prequeue(tv_shows, caplog):
     # Test prequeue command
     runner = CliRunner()
     result = runner.invoke(prequeue,
-                           ['--tv-shows', tv_shows, '--no-upload',
+                           ['--library', tv_shows, '--no-upload',
                             'http://localhost:8080/all.rss'])
     # Clean up
     server.shutdown()
@@ -68,7 +68,7 @@ def test_postqueue_directory(tv_shows, caplog, tmpdir):
         pass
     # Test postqueue command
     runner = CliRunner()
-    result = runner.invoke(postqueue, ['--tv-shows', tv_shows,
+    result = runner.invoke(postqueue, ['--library', tv_shows,
                                        '--filename', torrent_name,
                                        '--directory', str(torrent_dir)])
     print(caplog.text)
@@ -90,7 +90,7 @@ def test_postqueue_file(tv_shows, caplog, tmpdir):
         pass
     # Test postqueue command
     runner = CliRunner()
-    result = runner.invoke(postqueue, ['--tv-shows', tv_shows,
+    result = runner.invoke(postqueue, ['--library', tv_shows,
                                        '--filename', torrent_name,
                                        '--directory', str(torrent_dir)])
     print(caplog.text)
@@ -115,7 +115,7 @@ def test_postqueue_file_obfuscated(tv_shows, caplog, tmpdir):
         pass
     # Test postqueue command
     runner = CliRunner()
-    result = runner.invoke(postqueue, ['--tv-shows', tv_shows,
+    result = runner.invoke(postqueue, ['--library', tv_shows,
                                        '--filename', torrent_name,
                                        '--directory', str(torrent_dir)])
     print(caplog.text)
