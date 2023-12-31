@@ -234,7 +234,7 @@ def purge(library, days, delete):
             ctime = date.fromtimestamp(getctime(f))
             if ctime < cut_off:
                 found.append((f, ctime))
-            log.debug('Found file "{f}" ({ctime})')
+            log.debug(f'Found file "{f}" ({ctime})')
         for f, ctime in found:
             log.info(f'Deleting file "{f}" ({ctime})')
             # Delete the directory
