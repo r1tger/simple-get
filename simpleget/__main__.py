@@ -5,7 +5,7 @@ from click import option, group, argument, Path, File, confirm
 from collections import namedtuple
 from feedparser import parse
 from ngram import NGram
-from os import listdir, makedirs, chdir, remove
+from os import listdir, makedirs, chdir, remove, rmdir
 from os.path import (join, isfile, isdir, getsize, dirname, basename, exists,
                      splitext, getctime)
 from datetime import date, timedelta
@@ -240,6 +240,14 @@ def purge(library, days, delete):
             # Delete the directory
             if delete:
                 remove(f)
+                try:
+                    # Try to delete the directory as well. Throws an OSError if
+                    # directory is not empty. Deleting the EMPTY directory for
+                    # the season will remove the TV shows from Emby.
+                    rmdir(dirname(f))
+                except OSError:
+                    # Directory was not empty
+                    continue
     log.info('{s:-^80}'.format(s=' Finished simpleget (purge) '))
 
 
