@@ -1,0 +1,11 @@
+[Unit]
+Description=Simpleget postqueue processing
+
+[Service]
+Type=simple
+User=nzbget
+Group=nzbget
+ExecStart=/usr/local/bin/simpleget-postqueue
+
+[Install]
+WantedBy=multi-user.target

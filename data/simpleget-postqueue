@@ -1,0 +1,11 @@
+#!/bin/bash
+
+inotifywait -mre close_write /media/storage/Incoming/NZBGet/Series | while read dirname events basename;
+do
+    #echo "test $dirname $events $basename"
+    /usr/local/bin/simpleget --log="/tmp/simpleget-postqueue.log" postqueue \
+                             --library="/media/storage/TV Shows/New" \
+                             --library="/media/storage/TV Shows/Archive" \
+                             --filename="${dirname}" \
+                             --no-nzbget
+done
