@@ -54,10 +54,10 @@ def main(log, debug):
 @option('--get-all', is_flag=True, default=False, help='Download all tv shows')
 @option('--no-pilots', is_flag=True, default=False,
         help='Do not download the first episode of a season automatically')
-@option('--no-upload', is_flag=True, default=False,
-        help='Do not upload to Transmission')
+@option('--no-nzbget', is_flag=True, default=False,
+        help='Do not upload to NZBGet')
 def prequeue(url, library, nzbget_url, get_all, no_pilots,
-             no_upload):
+             no_nzbget):
     """Parse an RSS feed for new nzbs.
 
     :url: URL to NZB RSS to load
@@ -70,7 +70,7 @@ def prequeue(url, library, nzbget_url, get_all, no_pilots,
     log.info('{s:-^80}'.format(s=' Start simpleget (prequeue)'))
 
     # NZBGet rpc-xml API
-    nzbget = None if no_upload else ServerProxy(nzbget_url)
+    nzbget = None if no_nzbget else ServerProxy(nzbget_url)
 
     # Retrieve the URL
     response = parse(url)
@@ -127,21 +127,34 @@ def prequeue(url, library, nzbget_url, get_all, no_pilots,
 @option('--filename', default='', help='File to process')
 @option('--directory', type=Path(), default='',
         help='Directory containing file to process')
-def postqueue(library, filename, directory):
+@option('--nzbget-url', default='http://apricot:6789/xmlrpc',
+        help='Full URL to nzbget xmlrpc interface')
+@option('--no-nzbget', is_flag=True, default=False,
+        help='Do not query NZBGet')
+def postqueue(library, filename, directory, nzbget_url, no_nzbget):
     """Move files upon download by transmission.
 
     :library: Multiple paths to directories containing TV Shows
     :filename: Filename to process. Can be a relative path (use directory to
         complete path to file) or absolute
     :directory: Directory to process, or to find filename
+    :nzbget_url: URL to nzbget xmlrpc interface
 
     """
     log.info('{s:-^80}'.format(s=' Start simpleget (postqueue)'))
 
+    # NZBGet rpc-xml API
+    nzbget = None if no_nzbget else ServerProxy(nzbget_url)
+    if nzbget:
+        status = nzbget.status()
+        if not status['ServerStandBy']:
+            # Server is doing something, stop postqueue
+            log.info('NZBGet is busy, stopping ...')
+            log.info('{s:-^80}'.format(s=' Finished simpleget (postqueue) '))
+            return False
+
     # Source filename or directory
-    original_path = source = join(directory, filename)
-    # Resolve any symlinks
-    path = realpath(original_path, strict=True)
+    path = source = realpath(join(directory, filename), strict=True)
     if isdir(path):
         chdir(path)
         # Find the largest file in the source directory

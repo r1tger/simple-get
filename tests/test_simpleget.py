@@ -47,7 +47,7 @@ def test_prequeue(tv_shows, caplog):
     # Test prequeue command
     runner = CliRunner()
     result = runner.invoke(prequeue,
-                           ['--library', tv_shows, '--no-upload',
+                           ['--library', tv_shows, '--no-nzbget',
                             'http://localhost:8080/all.rss'])
     # Clean up
     server.shutdown()
@@ -69,7 +69,8 @@ def test_postqueue_directory(tv_shows, caplog, tmpdir):
     # Test postqueue command
     runner = CliRunner()
     result = runner.invoke(postqueue, ['--library', tv_shows,
-                                       '--directory', dirname(source)])
+                                       '--directory', dirname(source),
+                                       '--no-nzbget'])
     print(caplog.text)
     # Asserts
     assert(result.exit_code == 0)
@@ -91,7 +92,8 @@ def test_postqueue_file(tv_shows, caplog, tmpdir):
     runner = CliRunner()
     result = runner.invoke(postqueue, ['--library', tv_shows,
                                        '--filename', torrent_name,
-                                       '--directory', str(torrent_dir)])
+                                       '--directory', str(torrent_dir),
+                                       '--no-nzbget'])
     print(caplog.text)
     # Asserts
     assert(result.exit_code == 0)
@@ -115,7 +117,8 @@ def test_postqueue_file_obfuscated(tv_shows, caplog, tmpdir):
     # Test postqueue command
     runner = CliRunner()
     result = runner.invoke(postqueue, ['--library', tv_shows,
-                                       '--directory', dirname(source)])
+                                       '--directory', dirname(source),
+                                       '--no-nzbget'])
     print(caplog.text)
     # Asserts
     assert(result.exit_code == 0)
