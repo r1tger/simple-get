@@ -183,11 +183,6 @@ def postqueue(library, filename, directory):
     if isdir(path):
         log.info(f'Removing source directory {path}')
         rmtree(path)
-    try:
-        # If there's symlink left over, remove as well
-        remove(original_path)
-    except FileNotFoundError:
-        pass
     log.info('{s:-^80}'.format(s=' Finished simpleget (postqueue) '))
 
 
