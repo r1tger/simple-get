@@ -7,7 +7,7 @@ from feedparser import parse
 from ngram import NGram
 from os import listdir, makedirs, chdir, remove, rmdir
 from os.path import (join, isfile, isdir, getsize, dirname, basename, exists,
-                     splitext, getctime)
+                     splitext, getctime, realpath)
 from datetime import date, timedelta
 from re import match, I
 from glob import iglob, escape
@@ -19,7 +19,7 @@ import logging
 log = logging.getLogger(__name__)
 
 LOG_FORMAT = '[%(levelname)s] [%(relativeCreated)d] %(message)s'
-EPISODES_REGEX = r'(.+)[\.  ][s|S]?([0-9]{1,2})[x|X|e|E]([0-9]{2}).*((1080p|2160p).*)'
+EPISODES_REGEX = r'(.+)[\. ][s|S]?([0-9]{1,2})[x|X|e|E]([0-9]{2}).*((1080p|2160p).*)'
 MOVIES_REGEX = r'(?P<title>.+) \((?P<year>.+)\) \[1080p\]'
 THRESHOLD = 0.6
 
@@ -139,7 +139,9 @@ def postqueue(library, filename, directory):
     log.info('{s:-^80}'.format(s=' Start simpleget (postqueue)'))
 
     # Source filename or directory
-    path = source = join(directory, filename)
+    original_path = source = join(directory, filename)
+    # Resolve any symlinks
+    path = realpath(original_path, strict=True)
     if isdir(path):
         chdir(path)
         # Find the largest file in the source directory
@@ -173,7 +175,6 @@ def postqueue(library, filename, directory):
     log.info(f'Writing "{source}" to "{destination}"')
     if exists(destination):
         raise ValueError(f'Destination "{destination}" already exists')
-
     # Create directory if it does not exist
     makedirs(dirname(destination), exist_ok=True)
     # Move file to new location
@@ -182,6 +183,11 @@ def postqueue(library, filename, directory):
     if isdir(path):
         log.info(f'Removing source directory {path}')
         rmtree(path)
+    try:
+        # If there's symlink left over, remove as well
+        remove(original_path)
+    except FileNotFoundError:
+        pass
     log.info('{s:-^80}'.format(s=' Finished simpleget (postqueue) '))
 
 
