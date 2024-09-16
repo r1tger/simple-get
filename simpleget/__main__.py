@@ -19,7 +19,7 @@ import logging
 log = logging.getLogger(__name__)
 
 LOG_FORMAT = '[%(levelname)s] [%(relativeCreated)d] %(message)s'
-EPISODES_REGEX = r'(.+)[\. ][s|S]?([0-9]{1,2})[x|X|e|E]([0-9]{2}).*((1080p|2160p).*)'
+EPISODES_REGEX = r'([a-zA-Z\. ]+)(?:\.\d{4})?[\. ][sS]?([0-9]{1,2})[xXeE]([0-9]{2}).*((1080p|2160p).*)'
 MOVIES_REGEX = r'(?P<title>.+) \((?P<year>.+)\) \[1080p\]'
 THRESHOLD = 0.6
 
